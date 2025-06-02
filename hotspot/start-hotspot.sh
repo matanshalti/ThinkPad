@@ -59,7 +59,7 @@ echo "[+] Starting dnsmasq..."
 sudo dnsmasq --conf-file=/tmp/dnsmasq-hotspot.conf &
 
 echo "[+] Starting hostapd..."
-sudo hostapd /tmp/hostapd-hotspot.conf &
+sudo hostapd /tmp/hostapd-hotspot.conf > /var/log/hostapd-hotspot.log 2>&1 &
 
 echo "[+] Enabling IP forwarding..."
 sudo sysctl -w net.ipv4.ip_forward=1
