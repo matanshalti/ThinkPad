@@ -1,0 +1,13 @@
+[Unit]
+Description=ThinkPad Wi-Fi Hotspot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/opt/hotspot/start-hotspot.sh
+Restart=on-failure
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

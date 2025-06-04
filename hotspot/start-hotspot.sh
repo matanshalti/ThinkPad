@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Wi-Fi Hotspot Setup Script - Final Version
-# Matan's ThinkPad W541 | Ubuntu Server 24.04
+# Wi-Fi Hotspot Setup Script - Optimized
+# ThinkPad W541 | Ubuntu Server 24.04
 
 set -e
 
@@ -9,12 +9,13 @@ set -e
 IF_WLAN="wlp3s0"
 IF_ETH="enp0s25"
 SSID="ThinkpadHotspot"
-PASSWORD="ThinkpadSecure123"
+source /opt/hotspot/hotspot.env
 GATEWAY="192.168.50.1"
 DHCP_START="192.168.50.10"
 DHCP_END="192.168.50.100"
 DNS1="1.1.1.1"
 DNS2="8.8.8.8"
+LOG_HAPD="/var/log/hostapd-hotspot.log"
 # ==============
 
 echo "[+] Bringing up Wi-Fi interface $IF_WLAN..."
@@ -42,13 +43,16 @@ interface=$IF_WLAN
 driver=nl80211
 ssid=$SSID
 hw_mode=g
-channel=7
-wmm_enabled=0
+channel=6
+ieee80211n=1
+wmm_enabled=1
 auth_algs=1
 wpa=2
 wpa_passphrase=$PASSWORD
 wpa_key_mgmt=WPA-PSK
 rsn_pairwise=CCMP
+ht_capab=[HT40+][SHORT-GI-40][DSSS_CCK-40]
+max_num_sta=4
 EOF
 
 echo "[+] Killing previous dnsmasq/hostapd (if any)..."
@@ -59,16 +63,22 @@ echo "[+] Starting dnsmasq..."
 sudo dnsmasq --conf-file=/tmp/dnsmasq-hotspot.conf &
 
 echo "[+] Starting hostapd..."
-sudo hostapd /tmp/hostapd-hotspot.conf > /var/log/hostapd-hotspot.log 2>&1 &
+sudo hostapd /tmp/hostapd-hotspot.conf > "$LOG_HAPD" 2>&1 &
 
 echo "[+] Enabling IP forwarding..."
 sudo sysctl -w net.ipv4.ip_forward=1
+
+echo "[+] Tuning NAT performance..."
+echo 262144 | sudo tee /proc/sys/net/netfilter/nf_conntrack_max > /dev/null
+
+echo "[+] Disabling IPv6 (improves speed for some clients)..."
+sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1 > /dev/null
+sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1 > /dev/null
 
 echo "[+] Setting up NAT with iptables..."
 sudo iptables -t nat -C POSTROUTING -o "$IF_ETH" -j MASQUERADE 2>/dev/null || \
 sudo iptables -t nat -A POSTROUTING -o "$IF_ETH" -j MASQUERADE
 
-# === UFW RULES (safe reapplication) ===
 echo "[+] Configuring UFW rules..."
 sudo ufw allow in on "$IF_WLAN" || true
 sudo ufw allow out on "$IF_ETH" || true
@@ -79,3 +89,4 @@ sudo ufw reload
 echo ""
 echo "✅ Hotspot '$SSID' is now active!"
 echo "📡 Connect using password: $PASSWORD"
+echo "📋 Log: tail -f $LOG_HAPD"
